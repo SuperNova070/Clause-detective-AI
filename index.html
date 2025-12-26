@@ -4,78 +4,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CLAUSE. | Premium German Contract Intelligence</title>
+    <title>CLAUSE. | The Compass for German Legal Navigation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@300;400;700;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --brand-primary: #7c3aed;
-            --brand-secondary: #c026d3;
-            --brand-obsidian: #020617;
+            --scout-obsidian: #020617;
+            --scout-forest: #0C2C24;
+            --scout-sand: #F5F2ED;
+            --scout-violet: #7c3aed;
         }
         body { 
-            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
             -webkit-font-smoothing: antialiased;
-            letter-spacing: -0.025em;
-            background-color: #ffffff;
+            background-color: var(--scout-sand);
+            color: var(--scout-obsidian);
         }
-        .text-huge {
-            font-size: clamp(3rem, 8vw, 6rem);
-            line-height: 0.9;
-            font-weight: 800;
-            letter-spacing: -0.05em;
+        h1, h2, h3, .brand-font {
+            font-family: 'Outfit', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
-        .glass-header {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(30px);
-            -webkit-backdrop-filter: blur(30px);
-            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        .text-hero {
+            font-size: clamp(3.5rem, 10vw, 7.5rem);
+            line-height: 0.85;
+            font-weight: 900;
         }
-        .premium-shadow {
-            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.1);
+        .glass-nav {
+            background: rgba(245, 242, 237, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(2, 6, 23, 0.05);
         }
-        .bento-card {
-            background: white;
-            border: 1px solid rgba(0, 0, 0, 0.04);
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        .scout-card {
+            background: #ffffff;
+            border: 1px solid rgba(2, 6, 23, 0.08);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .bento-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 40px -10px rgba(124, 58, 237, 0.1);
-            border-color: rgba(124, 58, 237, 0.2);
+        .scout-card:hover {
+            border-color: var(--scout-obsidian);
+            transform: translateY(-2px);
         }
-        .mesh-gradient {
-            background: radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.05) 0px, transparent 50%),
-                        radial-gradient(at 100% 100%, rgba(192, 38, 211, 0.05) 0px, transparent 50%);
+        .scout-button {
+            background: var(--scout-obsidian);
+            color: white;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: all 0.3s ease;
         }
-        @keyframes scan {
-            0% { top: 0%; opacity: 0; }
-            50% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
+        .scout-button:hover {
+            background: #1e293b;
+            transform: scale(1.02);
         }
-        .scanner-bar {
-            position: absolute;
-            height: 2px;
+        .atmospheric-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
-            background: linear-gradient(90deg, transparent, #7c3aed, transparent);
-            animation: scan 3s infinite linear;
+            height: 100%;
+            z-index: -1;
+            background-image: linear-gradient(to bottom, rgba(245, 242, 237, 0.7), rgba(245, 242, 237, 0.9)), url('https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&q=80&w=2000');
+            background-size: cover;
+            background-position: center;
+            opacity: 0.4;
         }
-        /* Custom scrollbar for premium feel */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { 
-            background: #e2e8f0; 
-            border-radius: 10px;
+        @keyframes line-glow {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
-        .premium-button {
-            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        .scanner-line {
+            height: 1px;
+            width: 100%;
+            background: linear-gradient(90deg, transparent, var(--scout-obsidian), transparent);
+            position: absolute;
+            top: 50%;
+            animation: line-glow 2.5s infinite ease-in-out;
         }
-        .premium-button:active {
-            transform: scale(0.96);
+        .consultation-badge {
+            background: var(--scout-forest);
+            color: #d1fae5;
         }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--scout-sand); }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 <script type="importmap">
 {
@@ -83,12 +98,14 @@
     "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
+    "jspdf": "https://esm.sh/jspdf@^2.5.1"
   }
 }
 </script>
 </head>
-<body class="mesh-gradient min-h-screen text-slate-900 selection:bg-violet-100">
+<body class="selection:bg-slate-900 selection:text-white">
+    <div class="atmospheric-bg"></div>
     <div id="root"></div>
 </body>
 </html>

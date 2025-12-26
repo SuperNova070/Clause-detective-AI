@@ -5,6 +5,7 @@ import { AccessLevel, UserProfile, ConsultationSlot } from './types';
 import Auth from './components/Auth';
 import AdminDashboard from './components/AdminDashboard';
 import PaymentGate from './components/PaymentGate';
+import { jsPDF } from 'jspdf';
 
 type InputMode = 'text' | 'file';
 type ViewMode = 'user' | 'admin';
@@ -24,16 +25,16 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
+    const handleScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const mockSlots: ConsultationSlot[] = [
-    { id: '1', date: 'Next Monday', time: '10:00' },
-    { id: '2', date: 'Next Monday', time: '14:30' },
-    { id: '3', date: 'Next Tuesday', time: '11:00' },
-    { id: '4', date: 'Next Wednesday', time: '16:00' },
+    { id: '1', date: 'Upcoming Monday', time: '10:00' },
+    { id: '2', date: 'Upcoming Monday', time: '14:30' },
+    { id: '3', date: 'Upcoming Tuesday', time: '11:00' },
+    { id: '4', date: 'Upcoming Wednesday', time: '16:00' },
   ];
 
   const handleLogin = (authenticatedUser: UserProfile) => {
@@ -50,7 +51,7 @@ const App: React.FC = () => {
   const handleAnalyze = async () => {
     const input = inputMode === 'text' ? contractText : contractFile;
     if (!input) {
-      setError(inputMode === 'text' ? "Paste your contract to begin." : "Upload a PDF to begin.");
+      setError(inputMode === 'text' ? "PLEASE INPUT TEXT TO NAVIGATE." : "PLEASE UPLOAD DOCUMENT TO SCAN.");
       return;
     }
 
@@ -58,16 +59,14 @@ const App: React.FC = () => {
     setError(null);
     setAnalysis(null);
 
-    // Smooth scroll to results after a short delay
-    setTimeout(() => {
-      document.getElementById('result-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-
     try {
       const result = await analyzeContract(input, accessLevel, accessLevel === 'premium' ? mockSlots : undefined);
       setAnalysis(result);
+      setTimeout(() => {
+        document.getElementById('result-canvas')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 500);
     } catch (err: any) {
-      setError(err.message || "Auditing failure.");
+      setError(err.message || "SCANNER ERROR.");
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +76,7 @@ const App: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.type !== 'application/pdf') {
-        setError("Invalid format. Please provide a PDF.");
+        setError("INVALID FORMAT. PDF REQUIRED.");
         setContractFile(null);
         return;
       }
@@ -99,297 +98,369 @@ const App: React.FC = () => {
     else setAccessLevel('premium');
   };
 
-  const handlePaymentSuccess = () => {
-    setAccessLevel('premium');
-    setShowPaymentGate(false);
-    if (user) setUser({ ...user, accessLevel: 'premium' });
+  const handleDownloadPDF = () => {
+    if (!analysis) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const contentWidth = pageWidth - (margin * 2);
+    
+    // Brand Header
+    doc.setFillColor(2, 6, 23); // Obsidian
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text("CLAUSE.", margin, 25);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text("INTELLIGENCE MAP REPORT", margin, 32);
+    doc.text(new Date().toLocaleDateString(), pageWidth - margin - 30, 25);
+
+    // Content Styling
+    doc.setTextColor(30, 41, 59); // Slate-800
+    doc.setFontSize(11);
+    
+    // Clean markdown characters for the PDF
+    const cleanText = analysis
+      .replace(/[#*]/g, '') // Remove hash and asterisks
+      .replace(/🟢|🟡|🔴/g, (match) => `[${match === '🟢' ? 'OK' : match === '🟡' ? 'WARNING' : 'RISK'}] `);
+
+    const splitText = doc.splitTextToSize(cleanText, contentWidth);
+    
+    // Pagination logic
+    let cursorY = 55;
+    const lineHeight = 7;
+    
+    splitText.forEach((line: string) => {
+      if (cursorY > pageHeight - margin - 20) {
+        doc.addPage();
+        cursorY = margin;
+        
+        // Mini header on new pages
+        doc.setDrawColor(2, 6, 23);
+        doc.line(margin, margin - 5, pageWidth - margin, margin - 5);
+      }
+      doc.text(line, margin, cursorY);
+      cursorY += lineHeight;
+    });
+
+    // Disclaimer / Footer
+    if (cursorY > pageHeight - 40) {
+      doc.addPage();
+      cursorY = 30;
+    }
+    
+    doc.setDrawColor(226, 232, 240);
+    doc.line(margin, cursorY + 10, pageWidth - margin, cursorY + 10);
+    
+    doc.setTextColor(148, 163, 184); // Slate-400
+    doc.setFontSize(8);
+    const disclaimer = "DISCLAIMER: CLAUSE. PROVIDES INFORMATIONAL MAPS FOR NAVIGATION ONLY. THIS IS NOT LEGAL ADVICE AND DOES NOT CONSTITUTE A BINDING LEGAL OPINION.";
+    const splitDisclaimer = doc.splitTextToSize(disclaimer, contentWidth);
+    doc.text(splitDisclaimer, margin, cursorY + 20);
+
+    doc.save(`Clause_Map_Report_${new Date().getTime()}.pdf`);
   };
 
   if (!user) return <Auth onLogin={handleLogin} />;
 
   if (user.role === 'admin' && viewMode === 'admin') {
-    return (
-      <div className="min-h-screen bg-slate-950">
-        <div className="fixed top-6 right-8 z-50 flex items-center space-x-3">
-          <button 
-            onClick={() => setViewMode('user')}
-            className="bg-white/10 text-white px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 hover:bg-white/20 transition-all"
-          >
-            User View
-          </button>
-          <button onClick={handleLogout} className="bg-rose-500 text-white px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all">
-            Logout
-          </button>
-        </div>
-        <AdminDashboard user={user} />
-      </div>
-    );
+    return <AdminDashboard user={user} />;
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-x-hidden">
-      {/* Premium Pill Navbar */}
-      <nav className={`fixed top-6 left-1/2 -translate-x-1/2 z-[60] w-full max-w-4xl px-4 transition-all duration-500 ${scrolled ? 'translate-y-[-10px]' : ''}`}>
-        <div className="glass-header rounded-full px-6 h-14 flex items-center justify-between border border-black/5 shadow-2xl">
-          <div className="flex items-center space-x-3">
-             <div className="w-8 h-8 bg-slate-900 rounded-full flex items-center justify-center text-white font-black text-sm tracking-tighter">C.</div>
-             <span className="text-xs font-black uppercase tracking-[0.2em] hidden sm:inline-block">Clause.</span>
+    <div className="min-h-screen flex flex-col font-sans">
+      {/* SCOUT-STYLE HEADER */}
+      <header className={`fixed top-0 left-0 w-full z-50 transition-all duration-700 ${scrolled ? 'glass-nav py-4' : 'py-8'}`}>
+        <div className="max-w-[1400px] mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-center space-x-12">
+            <div className="brand-font font-black text-2xl tracking-tighter flex items-center space-x-2">
+              <span className="w-8 h-8 bg-slate-900 text-white flex items-center justify-center rounded-sm">C</span>
+              <span>CLAUSE<span className="opacity-30">.</span></span>
+            </div>
+            <nav className="hidden lg:flex space-x-8 text-[11px] font-bold uppercase tracking-[0.2em] opacity-60">
+              <a href="#" className="hover:opacity-100 transition-opacity">The Compass</a>
+              <a href="#" className="hover:opacity-100 transition-opacity">Expert Review</a>
+              <a href="#" className="hover:opacity-100 transition-opacity">Story</a>
+            </nav>
           </div>
-
+          
           <div className="flex items-center space-x-6">
-            <div className="hidden md:flex space-x-6 text-[10px] font-black uppercase tracking-widest">
-               <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="hover:text-violet-600">Home</button>
-               <button onClick={handlePremiumRequest} className="hover:text-violet-600">Upgrade</button>
-               <button className="hover:text-violet-600">Help</button>
-            </div>
-            
-            <div className="h-4 w-px bg-slate-200"></div>
-
-            <div className="flex items-center space-x-3 group cursor-pointer" onClick={handleLogout}>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-slate-900 transition-colors hidden xs:block">Logout</span>
-              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-black text-[10px] text-slate-600 group-hover:bg-slate-200 transition-all">
-                {user.email.charAt(0).toUpperCase()}
-              </div>
-            </div>
+            <button onClick={handlePremiumRequest} className="hidden sm:block text-[11px] font-bold uppercase tracking-widest border-b border-slate-950 pb-0.5 hover:opacity-50 transition-opacity">
+              Upgrade to Deep Audit
+            </button>
+            <div className="h-4 w-px bg-slate-300"></div>
+            <button onClick={handleLogout} className="text-[11px] font-bold uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity">
+              Sign Out
+            </button>
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* Hero Section */}
-      <header className="pt-32 pb-16 md:pt-48 md:pb-32 px-6 flex flex-col items-center text-center max-w-7xl mx-auto w-full">
-         <div className="inline-block px-3 py-1 bg-violet-50 text-violet-600 rounded-full text-[9px] font-black uppercase tracking-[0.25em] mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            Powered by Gemini Intelligence
-         </div>
-         <h1 className="text-huge text-slate-950 mb-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
-           Legal Clarity. <br />
-           <span className="text-slate-300">Simplified.</span>
-         </h1>
-         <p className="max-w-xl text-slate-500 font-medium text-base md:text-lg mb-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-           The new standard for German contract analysis. Join 12,000+ people decoding complex legal terms in seconds.
-         </p>
-         
-         <div className="flex items-center space-x-4 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-            <div className="flex -space-x-3">
+      {/* HERO SECTION */}
+      <section className="pt-48 pb-24 px-6 max-w-[1400px] mx-auto w-full">
+        <div className="grid lg:grid-cols-2 gap-12 items-end">
+          <div className="space-y-8">
+            <h1 className="text-hero brand-font animate-in fade-in slide-in-from-bottom-8 duration-700">
+              EXPLORE <br />
+              <span className="opacity-40 italic font-light">WITHOUT</span> <br />
+              RISK.
+            </h1>
+            <p className="max-w-md text-lg text-slate-600 font-medium leading-relaxed opacity-80 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-200">
+              German contracts are complex territories. We provide the map and the gear you need to move forward with absolute confidence.
+            </p>
+          </div>
+          <div className="flex flex-col space-y-4 lg:items-end animate-in fade-in slide-in-from-right-8 duration-1000 delay-500">
+            <div className="flex -space-x-3 mb-4">
               {[1,2,3,4].map(i => (
-                <div key={i} className="w-9 h-9 rounded-full border-4 border-white bg-slate-200 shadow-sm flex items-center justify-center overflow-hidden">
-                  <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" />
+                <div key={i} className="w-12 h-12 rounded-full border-4 border-[#F5F2ED] bg-slate-200 shadow-sm overflow-hidden">
+                  <img src={`https://i.pravatar.cc/150?u=${i*10}`} alt="User" />
                 </div>
               ))}
             </div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Trusted by Professionals</span>
-         </div>
-      </header>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Trusted by 12,000+ Explorers in Germany</p>
+          </div>
+        </div>
+      </section>
 
-      {/* Studio View */}
-      <main className="max-w-7xl mx-auto px-6 pb-32 w-full grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+      {/* MAIN CONSOLE GRID */}
+      <main className="max-w-[1400px] mx-auto w-full px-6 grid grid-cols-1 lg:grid-cols-12 gap-6 pb-32">
         
-        {/* Left: Action Control */}
-        <div className="lg:col-span-5 space-y-8 lg:sticky lg:top-28">
-           <div className="bento-card rounded-[2.5rem] p-8 md:p-10 relative overflow-hidden group">
-              <div className="flex items-center justify-between mb-10">
-                 <div className="flex bg-slate-50 p-1 rounded-full border border-black/5">
-                    <button 
-                      onClick={() => setInputMode('file')}
-                      className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${inputMode === 'file' ? 'bg-white shadow-xl text-slate-950' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                      Document
-                    </button>
-                    <button 
-                      onClick={() => setInputMode('text')}
-                      className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${inputMode === 'text' ? 'bg-white shadow-xl text-slate-950' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                      Snippet
-                    </button>
-                 </div>
-                 {inputMode === 'file' && contractFile && (
-                   <button onClick={handleClear} className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:underline">Clear</button>
-                 )}
+        {/* ACTION PANEL */}
+        <div className="lg:col-span-5 space-y-6">
+          <div className="scout-card p-10 flex flex-col h-full">
+            <div className="flex items-center justify-between mb-12">
+              <div className="flex space-x-6 text-[11px] font-bold uppercase tracking-widest">
+                <button 
+                  onClick={() => setInputMode('file')}
+                  className={`pb-1 border-b-2 transition-all ${inputMode === 'file' ? 'border-slate-900' : 'border-transparent text-slate-300 hover:text-slate-500'}`}
+                >
+                  Document Scan
+                </button>
+                <button 
+                  onClick={() => setInputMode('text')}
+                  className={`pb-1 border-b-2 transition-all ${inputMode === 'text' ? 'border-slate-900' : 'border-transparent text-slate-300 hover:text-slate-500'}`}
+                >
+                  Direct Snippet
+                </button>
               </div>
+              {contractFile && (
+                <button onClick={handleClear} className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Reset</button>
+              )}
+            </div>
 
+            <div className="flex-1">
               {inputMode === 'file' ? (
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className={`relative group cursor-pointer transition-all duration-500 ${contractFile ? 'scale-100' : 'hover:scale-[1.01]'}`}
+                  className={`aspect-[4/3] w-full border border-slate-100 bg-slate-50/50 flex flex-col items-center justify-center p-12 text-center cursor-pointer hover:bg-white transition-all group relative overflow-hidden`}
                 >
-                   <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf" className="hidden" />
-                   <div className={`w-full aspect-[4/5] md:aspect-[3/4] rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center p-12 text-center transition-all ${contractFile ? 'bg-slate-50 border-slate-200' : 'bg-slate-50/50 border-slate-100 hover:border-violet-300'}`}>
-                      {isLoading && <div className="scanner-bar"></div>}
-                      
-                      {contractFile ? (
-                        <div className="animate-in zoom-in duration-300">
-                           <div className="w-24 h-24 bg-white rounded-3xl shadow-2xl flex items-center justify-center mx-auto mb-6 text-violet-600">
-                             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                           </div>
-                           <p className="font-black text-slate-950 tracking-tighter text-lg truncate max-w-[220px] mx-auto">{contractFile.name}</p>
-                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-2">Ready for Audit</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                           <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto text-slate-300">
-                             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                           </div>
-                           <p className="font-bold text-slate-800 tracking-tight">Drop your contract</p>
-                           <p className="text-[10px] font-bold text-slate-400">PDF Files only</p>
-                        </div>
-                      )}
-                   </div>
+                  {isLoading && <div className="scanner-line"></div>}
+                  <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf" className="hidden" />
+                  
+                  {contractFile ? (
+                    <div className="animate-in zoom-in duration-300 z-10">
+                      <svg className="w-16 h-16 text-slate-900 mx-auto mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      <p className="font-bold text-xl tracking-tight mb-2 truncate max-w-[250px]">{contractFile.name}</p>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Document Secured</p>
+                    </div>
+                  ) : (
+                    <div className="z-10 group-hover:scale-105 transition-transform">
+                      <div className="w-12 h-12 bg-white flex items-center justify-center shadow-sm mx-auto mb-6">
+                        <svg className="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                      </div>
+                      <p className="brand-font font-bold text-slate-400 tracking-widest">UPLOAD DOCUMENT</p>
+                      <p className="text-[10px] text-slate-300 mt-2">PDF | Max 10MB</p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <textarea
                   value={contractText}
                   onChange={(e) => setContractText(e.target.value)}
-                  placeholder="Paste contract sections here..."
-                  className="w-full aspect-[4/5] md:aspect-[3/4] p-8 bg-slate-50 rounded-[2rem] focus:ring-4 focus:ring-violet-500/5 text-sm leading-relaxed text-slate-700 font-medium resize-none placeholder:text-slate-300 outline-none border border-black/5"
+                  placeholder="PASTE CONTRACT TEXT HERE FOR ANALYSIS..."
+                  className="w-full aspect-[4/3] p-10 bg-slate-50/50 border border-slate-100 focus:bg-white focus:border-slate-900 outline-none text-sm font-medium leading-relaxed resize-none transition-all placeholder:text-slate-300"
                 ></textarea>
               )}
+            </div>
 
-              <div className="mt-8">
-                 <button
-                    onClick={handleAnalyze}
-                    disabled={isLoading}
-                    className="w-full premium-button bg-slate-950 text-white font-black py-5 rounded-full text-[11px] uppercase tracking-[0.25em] shadow-2xl disabled:opacity-50 flex items-center justify-center group overflow-hidden relative"
-                 >
-                    {isLoading ? (
-                      <span className="flex items-center space-x-3">
-                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span>Analyzing Core...</span>
-                      </span>
-                    ) : (
-                      <>Run Intelligence Scan</>
-                    )}
-                 </button>
-                 {error && <p className="text-rose-500 text-[10px] font-black uppercase tracking-widest text-center mt-4 animate-in fade-in duration-300">{error}</p>}
-              </div>
-           </div>
-
-           {/* Access Bento */}
-           <div className="grid grid-cols-2 gap-4">
-              <div className={`p-6 rounded-[2rem] border transition-all flex flex-col justify-between h-40 ${accessLevel === 'premium' ? 'bg-violet-600 text-white' : 'bg-white border-black/5'}`}>
-                 <svg className={`w-6 h-6 ${accessLevel === 'premium' ? 'text-white' : 'text-violet-600'}`} fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-1">{accessLevel === 'premium' ? 'Status Active' : 'Basic Tier'}</p>
-                    <p className={`text-[11px] font-bold ${accessLevel === 'premium' ? 'text-violet-100' : 'text-slate-400'}`}>Deep risk scans {accessLevel === 'premium' ? 'enabled' : 'locked'}.</p>
-                 </div>
-              </div>
-              <button 
-                onClick={handlePremiumRequest}
-                className="bg-slate-900 rounded-[2rem] p-6 text-white text-left flex flex-col justify-between h-40 hover:bg-black transition-all group"
+            <div className="mt-10">
+              <button
+                onClick={handleAnalyze}
+                disabled={isLoading}
+                className="w-full scout-button py-6 flex items-center justify-center disabled:opacity-30"
               >
-                 <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                 </div>
-                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-1">Upgrade</p>
-                    <p className="text-[11px] font-bold text-slate-400">Unlock Expert Review & PDF Reports.</p>
-                 </div>
+                {isLoading ? (
+                  <span className="flex items-center space-x-3">
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span>Processing Navigation...</span>
+                  </span>
+                ) : (
+                  <>START INTELLIGENCE SCAN</>
+                )}
               </button>
-           </div>
+              {error && <p className="text-rose-600 text-[10px] font-bold text-center mt-4 uppercase tracking-widest">{error}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className={`p-8 scout-card flex flex-col justify-between ${accessLevel === 'premium' ? 'bg-slate-900 text-white' : ''}`}>
+              <div className="text-[11px] font-bold uppercase tracking-[0.2em] mb-4">Tier Status</div>
+              <div>
+                <p className="text-2xl font-black brand-font">{accessLevel.toUpperCase()}</p>
+                <p className="text-[10px] font-medium opacity-60 mt-1">Deep analysis {accessLevel === 'premium' ? 'active' : 'ready for unlock'}.</p>
+              </div>
+            </div>
+            <button 
+              onClick={handlePremiumRequest}
+              className="p-8 scout-card bg-[#DED9D2] hover:bg-slate-900 hover:text-white flex flex-col justify-between group"
+            >
+              <div className="w-8 h-8 rounded-full border border-slate-400 flex items-center justify-center group-hover:border-white transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] mb-1">Expert Hub</p>
+                <p className="text-[10px] font-medium opacity-60">Book specialist consultation.</p>
+              </div>
+            </button>
+          </div>
         </div>
 
-        {/* Right: Output Canvas */}
-        <div id="result-section" className="lg:col-span-7 min-h-[600px]">
-           {!analysis && !isLoading ? (
-             <div className="w-full aspect-video lg:h-full bg-slate-50/50 rounded-[3rem] border border-black/5 border-dashed flex flex-col items-center justify-center p-12 text-center">
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-8 shadow-sm">
-                   <svg className="w-8 h-8 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+        {/* RESULTS CANVAS */}
+        <div id="result-canvas" className="lg:col-span-7 min-h-[600px]">
+          {!analysis && !isLoading ? (
+            <div className="w-full h-full scout-card border-dashed flex flex-col items-center justify-center p-20 text-center opacity-30 grayscale hover:grayscale-0 transition-all duration-1000">
+               <svg className="w-20 h-20 text-slate-300 mb-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="1" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+               <h3 className="brand-font text-2xl font-bold tracking-widest">NAVIGATOR READY</h3>
+               <p className="text-[11px] font-bold uppercase tracking-widest mt-4">Awaiting environmental input for scan...</p>
+            </div>
+          ) : isLoading ? (
+            <div className="w-full h-full scout-card p-20 flex flex-col items-center justify-center text-center">
+               <div className="relative w-32 h-32 mb-12">
+                  <div className="absolute inset-0 border border-slate-900/10 rounded-full animate-ping"></div>
+                  <div className="absolute inset-4 border border-slate-900/20 rounded-full animate-pulse"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                     <svg className="w-12 h-12 text-slate-900 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="square" strokeLinejoin="miter" strokeWidth="1.5" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" /></svg>
+                  </div>
+               </div>
+               <h2 className="brand-font text-3xl font-black mb-4">MAPPING TERRITORY...</h2>
+               <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-slate-400">Building Intelligence Log</p>
+            </div>
+          ) : (
+            <div className="scout-card shadow-2xl animate-in fade-in slide-in-from-right-8 duration-700">
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between sticky top-24 bg-white/90 backdrop-blur z-10">
+                <div className="flex items-center space-x-4">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                  <h2 className="brand-font text-xl font-bold tracking-wider">MAP REPORT</h2>
                 </div>
-                <h3 className="text-xl font-black text-slate-300 tracking-tight">Intelligence Canvas</h3>
-                <p className="text-xs font-bold text-slate-400 mt-4 max-w-[200px] leading-relaxed uppercase tracking-widest">Awaiting document for scan results...</p>
-             </div>
-           ) : isLoading ? (
-             <div className="w-full min-h-[600px] lg:h-full bg-white rounded-[3rem] p-16 flex flex-col items-center justify-center text-center shadow-2xl relative overflow-hidden animate-pulse">
-                <div className="absolute inset-0 bg-gradient-to-b from-violet-50/20 to-transparent"></div>
-                <div className="w-24 h-24 mb-10 relative">
-                   <div className="absolute inset-0 bg-violet-600 rounded-3xl opacity-10 animate-ping"></div>
-                   <div className="absolute inset-0 flex items-center justify-center text-violet-600">
-                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                   </div>
+                <div className="flex space-x-3">
+                   <button 
+                    onClick={handleDownloadPDF}
+                    className="px-6 py-2 border border-slate-200 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors"
+                   >
+                    Download PDF
+                   </button>
+                   <button className="px-6 py-2 scout-button text-[10px]">Export</button>
                 </div>
-                <h2 className="text-2xl font-black text-slate-900 mb-4">Translating Jargon...</h2>
-                <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Building your intelligence report</p>
-             </div>
-           ) : (
-             <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-right-12 duration-1000">
-                <div className="px-10 py-10 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-xl z-10">
-                   <div>
-                      <h2 className="text-2xl font-black tracking-tight">Intelligence Report</h2>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Status: Confirmed Analysis</p>
-                   </div>
-                   <div className="flex space-x-3">
-                      <button className="p-4 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg></button>
-                      <button className="bg-slate-950 text-white px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">Export</button>
-                   </div>
+              </div>
+
+              <div className="p-12 md:p-20 space-y-16">
+                <div className="prose prose-slate max-w-none">
+                  {analysis?.split('\n').map((line, i) => {
+                    if (!line.trim()) return null;
+                    
+                    if (line.startsWith('#')) return <h1 key={i} className="brand-font text-5xl font-black mb-12 tracking-tighter leading-none">{line.replace('#', '').trim()}</h1>;
+                    if (line.startsWith('##')) return <h2 key={i} className="brand-font text-3xl font-black mt-20 mb-8 border-l-4 border-slate-950 pl-6">{line.replace('##', '').trim()}</h2>;
+                    
+                    if (line.includes('🟢') || line.includes('🟡') || line.includes('🔴')) {
+                       const isGood = line.includes('🟢');
+                       const isWarning = line.includes('🟡');
+                       return (
+                         <div key={i} className={`p-10 mb-8 border-l-8 ${isGood ? 'bg-emerald-50/50 border-emerald-500' : isWarning ? 'bg-amber-50/50 border-amber-500' : 'bg-rose-50/50 border-rose-500'}`}>
+                           <p className="text-sm font-bold leading-relaxed">{line.replace(/[🟢🟡🔴]/g, '').trim()}</p>
+                         </div>
+                       );
+                    }
+
+                    if (line.includes('🎥') || line.includes('Consultation')) {
+                       return (
+                         <div key={i} className="bg-slate-900 text-white p-12 my-16 relative group">
+                           <div className="absolute top-0 right-0 p-8 opacity-10">
+                              <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" /></svg>
+                           </div>
+                           <h4 className="brand-font text-3xl font-black mb-6">EXPERT DEPLOYMENT</h4>
+                           <p className="text-slate-400 text-sm mb-12 max-w-md">Your premium access includes a direct video session with a German relocation specialist to finalize your navigation strategy.</p>
+                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-10">
+                              {mockSlots.map(slot => (
+                                <button key={slot.id} className="bg-white/5 border border-white/10 p-4 text-[10px] font-bold uppercase tracking-widest hover:bg-white/20 transition-colors">
+                                  {slot.time}
+                                </button>
+                              ))}
+                            </div>
+                            <button className="w-full bg-white text-slate-900 py-6 text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-[#F5F2ED] transition-colors">SECURE VIDEO SLOT</button>
+                         </div>
+                       );
+                    }
+
+                    return <p key={i} className="text-slate-600 text-lg leading-relaxed mb-8 font-medium">{line}</p>;
+                  })}
                 </div>
 
-                <div className="p-10 md:p-16 space-y-12">
-                   <div className="markdown-content">
-                      {analysis?.split('\n').map((line, i) => {
-                        if (!line.trim()) return null;
-                        
-                        // Custom rendering for "Nike/Brand" style output
-                        if (line.startsWith('#')) return <h1 key={i} className="text-4xl font-black mb-10 tracking-tight leading-none text-slate-950">{line.replace('#', '').trim()}</h1>;
-                        if (line.startsWith('##')) return <h2 key={i} className="text-2xl font-black mt-16 mb-6 tracking-tight text-slate-950">{line.replace('##', '').trim()}</h2>;
-                        
-                        if (line.includes('🟢') || line.includes('🟡') || line.includes('🔴')) {
-                           const isGood = line.includes('🟢');
-                           const isWarning = line.includes('🟡');
-                           return (
-                             <div key={i} className={`p-8 rounded-[2rem] border mb-6 flex items-start ${isGood ? 'bg-emerald-50/50 border-emerald-100' : isWarning ? 'bg-amber-50/50 border-amber-100' : 'bg-rose-50/50 border-rose-100'}`}>
-                               <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-4 shrink-0 text-white font-black text-xs ${isGood ? 'bg-emerald-500' : isWarning ? 'bg-amber-500' : 'bg-rose-500'}`}>
-                                 {isGood ? '✓' : isWarning ? '!' : '×'}
-                               </div>
-                               <p className="text-sm font-bold leading-relaxed">{line.replace(/[🟢🟡🔴]/g, '').trim()}</p>
-                             </div>
-                           );
-                        }
-
-                        if (line.includes('🎥') || line.includes('Consultation')) {
-                           return (
-                             <div key={i} className="bg-slate-950 text-white p-10 rounded-[3rem] my-12 relative overflow-hidden group">
-                               <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20"></div>
-                               <h4 className="text-2xl font-black mb-4 relative z-10">Expert Deep-Dive</h4>
-                               <p className="text-slate-400 text-sm font-medium mb-10 relative z-10">Need human clarity? Your premium membership includes a 30-minute session with a German specialist.</p>
-                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
-                                  {mockSlots.map(slot => (
-                                    <button key={slot.id} className="bg-white/5 border border-white/10 p-3 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-white/10 transition-colors">
-                                      {slot.time}
-                                    </button>
-                                  ))}
-                                </div>
-                                <button className="w-full bg-white text-slate-950 py-4 rounded-full text-[10px] font-black uppercase tracking-widest mt-8 relative z-10 hover:bg-slate-100 transition-colors">Reserve Video Slot</button>
-                             </div>
-                           );
-                        }
-
-                        if (line.startsWith('-')) return <li key={i} className="ml-6 mb-3 text-slate-600 font-medium leading-relaxed list-none relative before:content-[''] before:absolute before:left-[-20px] before:top-2 before:w-1.5 before:h-1.5 before:bg-violet-400 before:rounded-full">{line.replace('-', '').trim()}</li>;
-                        
-                        return <p key={i} className="text-slate-600 text-base leading-relaxed mb-6 font-medium">{line}</p>;
-                      })}
-                   </div>
-
-                   <div className="pt-20 border-t border-black/5 text-center">
-                      <div className="bg-slate-50 p-10 rounded-[2.5rem] border border-black/5 text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-[0.2em] max-w-lg mx-auto italic">
-                        Disclaimer: CLAUSE. provides AI-driven informational briefs based on general standards. This is not legally binding advice.
-                      </div>
-                   </div>
+                <div className="pt-24 border-t border-slate-100">
+                  <div className="bg-[#DED9D2]/30 p-12 border-l border-r border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-loose text-center">
+                    DISCLAIMER: CLAUSE. PROVIDES INFORMATIONAL MAPS FOR NAVIGATION ONLY. THIS IS NOT LEGAL ADVICE AND DOES NOT CONSTITUTE A BINDING LEGAL OPINION.
+                  </div>
                 </div>
-             </div>
-           )}
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
       {showPaymentGate && (
-        <PaymentGate onSuccess={handlePaymentSuccess} onCancel={() => setShowPaymentGate(false)} />
+        <PaymentGate onSuccess={() => { setAccessLevel('premium'); setShowPaymentGate(false); }} onCancel={() => setShowPaymentGate(false)} />
       )}
       
-      <footer className="py-20 border-t border-black/5 text-center">
-         <div className="w-10 h-10 bg-slate-900 rounded-full flex items-center justify-center text-white font-black text-sm tracking-tighter mx-auto mb-8">C.</div>
-         <div className="flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0 md:space-x-12 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-            <a href="#" className="hover:text-slate-900 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-slate-900 transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-slate-900 transition-colors">Security Protocol</a>
-         </div>
-         <p className="mt-12 text-[10px] font-black uppercase tracking-[0.25em] text-slate-300">© 2024 CLAUSE. • Intelligence for Life</p>
+      <footer className="bg-slate-950 text-white py-32 px-6">
+        <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-16">
+          <div className="space-y-8">
+            <div className="brand-font font-black text-3xl tracking-tighter">CLAUSE<span className="opacity-20">.</span></div>
+            <p className="text-slate-500 text-sm leading-relaxed max-w-xs">
+              Defining the new standard for legal exploration in Europe. Join the community of informed explorers.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <p className="text-[11px] font-bold uppercase tracking-widest opacity-30">Vessel</p>
+              <ul className="space-y-2 text-sm font-medium">
+                <li><a href="#" className="hover:text-slate-400">The Map</a></li>
+                <li><a href="#" className="hover:text-slate-400">Deep Audit</a></li>
+                <li><a href="#" className="hover:text-slate-400">Experts</a></li>
+              </ul>
+            </div>
+            <div className="space-y-4">
+              <p className="text-[11px] font-bold uppercase tracking-widest opacity-30">Support</p>
+              <ul className="space-y-2 text-sm font-medium">
+                <li><a href="#" className="hover:text-slate-400">Help Center</a></li>
+                <li><a href="#" className="hover:text-slate-400">Terms</a></li>
+                <li><a href="#" className="hover:text-slate-400">Privacy</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="space-y-8">
+             <p className="text-[11px] font-bold uppercase tracking-widest opacity-30">Coordinates</p>
+             <p className="text-2xl font-black brand-font">BERLIN / GERMANY</p>
+             <div className="pt-8 border-t border-white/5 flex space-x-6 text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">
+               <span>EST. 2024</span>
+               <span>© CLAUSE GMBH</span>
+             </div>
+          </div>
+        </div>
       </footer>
     </div>
   );

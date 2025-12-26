@@ -15,7 +15,7 @@
             --scout-obsidian: #020617;
             --scout-forest: #0C2C24;
             --scout-sand: #F5F2ED;
-            --scout-violet: #7c3aed;
+            --scout-clay: #DED9D2;
         }
         body { 
             font-family: 'Plus Jakarta Sans', sans-serif; 
@@ -30,36 +30,43 @@
             letter-spacing: 0.05em;
         }
         .text-hero {
-            font-size: clamp(2.25rem, 12vw, 7.5rem);
-            line-height: 0.9;
+            /* Reduced clamp max and increased line-height to prevent collisions */
+            font-size: clamp(2.5rem, 12vw, 7.5rem);
+            line-height: 1;
             font-weight: 900;
+            letter-spacing: -0.04em;
         }
         .glass-nav {
-            background: rgba(245, 242, 237, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid rgba(2, 6, 23, 0.05);
+            background: rgba(245, 242, 237, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(2, 6, 23, 0.08);
+            z-index: 100;
         }
         .scout-card {
             background: #ffffff;
-            border: 1px solid rgba(2, 6, 23, 0.08);
-            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid rgba(2, 6, 23, 0.1);
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .scout-card:hover {
             border-color: var(--scout-obsidian);
-            transform: translateY(-2px);
+            box-shadow: 0 30px 60px -12px rgba(2, 6, 23, 0.1);
         }
         .scout-button {
             background: var(--scout-obsidian);
             color: white;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            transition: all 0.3s ease;
+            letter-spacing: 0.15em;
+            padding: 1.25rem 2rem;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            border-radius: 2px;
+            font-size: 0.75rem;
         }
         .scout-button:hover {
             background: #1e293b;
-            transform: scale(1.01);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
         }
         .atmospheric-bg {
             position: fixed;
@@ -68,31 +75,27 @@
             width: 100%;
             height: 100%;
             z-index: -1;
-            background-image: linear-gradient(to bottom, rgba(245, 242, 237, 0.75), rgba(245, 242, 237, 0.95)), url('https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&q=80&w=2000');
+            background-image: linear-gradient(to bottom, rgba(245, 242, 237, 0.8), rgba(245, 242, 237, 0.95)), url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&q=80&w=2000');
             background-size: cover;
             background-position: center;
-            opacity: 0.4;
         }
-        @keyframes line-glow {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
+        .grid-pattern {
+            background-image: radial-gradient(var(--scout-obsidian) 0.5px, transparent 0.5px);
+            background-size: 32px 32px;
+            opacity: 0.05;
         }
-        .scanner-line {
-            height: 1px;
+        @keyframes scan-line {
+            0% { transform: translateY(-100%); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(100%); opacity: 0; }
+        }
+        .scan-line {
+            height: 2px;
             width: 100%;
-            background: linear-gradient(90deg, transparent, var(--scout-obsidian), transparent);
+            background: var(--scout-obsidian);
             position: absolute;
-            top: 50%;
-            animation: line-glow 2s infinite ease-in-out;
-        }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: var(--scout-sand); }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-
-        /* Custom spacing for very small devices */
-        @media (max-width: 380px) {
-            .scout-card { padding: 1.5rem !important; }
-            .text-hero { font-size: 2.2rem; }
+            animation: scan-line 3s infinite ease-in-out;
+            z-index: 5;
         }
     </style>
 <script type="importmap">
@@ -109,6 +112,7 @@
 </head>
 <body class="selection:bg-slate-900 selection:text-white">
     <div class="atmospheric-bg"></div>
+    <div class="fixed inset-0 grid-pattern pointer-events-none z-[-1]"></div>
     <div id="root"></div>
 </body>
 </html>

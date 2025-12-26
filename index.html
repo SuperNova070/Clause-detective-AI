@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clause Detective AI | Premium German Contract Intelligence</title>
+    <title>CLAUSE. | Premium German Contract Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,52 +14,67 @@
         :root {
             --brand-primary: #7c3aed;
             --brand-secondary: #c026d3;
-            --brand-accent: #10b981;
+            --brand-obsidian: #020617;
         }
         body { 
             font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; 
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            letter-spacing: -0.015em;
+            letter-spacing: -0.025em;
+            background-color: #ffffff;
         }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
+        .text-huge {
+            font-size: clamp(3rem, 8vw, 6rem);
+            line-height: 0.9;
+            font-weight: 800;
+            letter-spacing: -0.05em;
         }
-        .premium-gradient {
-            background: linear-gradient(135deg, #7c3aed 0%, #c026d3 100%);
+        .glass-header {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         }
-        .premium-text-gradient {
-            background: linear-gradient(135deg, #7c3aed 0%, #c026d3 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .premium-shadow {
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.1);
         }
-        .report-page {
-            box-shadow: 0 10px 60px -15px rgba(124, 58, 237, 0.1);
+        .bento-card {
+            background: white;
+            border: 1px solid rgba(0, 0, 0, 0.04);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        .bento-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -10px rgba(124, 58, 237, 0.1);
+            border-color: rgba(124, 58, 237, 0.2);
+        }
+        .mesh-gradient {
+            background: radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.05) 0px, transparent 50%),
+                        radial-gradient(at 100% 100%, rgba(192, 38, 211, 0.05) 0px, transparent 50%);
+        }
+        @keyframes scan {
+            0% { top: 0%; opacity: 0; }
+            50% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .scanner-bar {
+            position: absolute;
+            height: 2px;
+            width: 100%;
+            background: linear-gradient(90deg, transparent, #7c3aed, transparent);
+            animation: scan 3s infinite linear;
+        }
+        /* Custom scrollbar for premium feel */
+        ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { 
             background: #e2e8f0; 
             border-radius: 10px;
         }
-        ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
-        
-        @keyframes subtle-pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.8; transform: scale(0.98); }
+        .premium-button {
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .animate-subtle { animation: subtle-pulse 3s infinite ease-in-out; }
-
-        /* Typography fixes for avoiding overlaps */
-        .markdown-content h1, .markdown-content h2, .markdown-content h3 {
-            line-height: 1.2;
-        }
-        .markdown-content p {
-            line-height: 1.6;
+        .premium-button:active {
+            transform: scale(0.96);
         }
     </style>
 <script type="importmap">
@@ -73,7 +88,7 @@
 }
 </script>
 </head>
-<body class="bg-[#fcfaff] text-slate-900 selection:bg-violet-100 selection:text-violet-900">
+<body class="mesh-gradient min-h-screen text-slate-900 selection:bg-violet-100">
     <div id="root"></div>
 </body>
 </html>
